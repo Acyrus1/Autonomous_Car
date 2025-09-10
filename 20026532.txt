@@ -1,0 +1,247 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class RobotController : MonoBehaviour
+{
+    // naming constraints do not change
+    [SerializeField] private WheelCollider frontLeftWheelCollider;
+    [SerializeField] private WheelCollider frontRightWheelCollider;
+    [SerializeField] private WheelCollider rearLeftWheelCollider;
+    [SerializeField] private WheelCollider rearRightWheelCollider;
+
+    [SerializeField] private Transform frontLeftWheelTransform;
+    [SerializeField] private Transform frontRightWheelTransform;
+    [SerializeField] private Transform rearLeftWheelTransform;
+    [SerializeField] private Transform rearRightWheelTransform;
+
+    [SerializeField] private Transform SensorFR;
+    [SerializeField] private Transform SensorL1;
+    [SerializeField] private Transform SensorL2;
+    [SerializeField] private Transform SensorL3;
+    [SerializeField] private Transform SensorR1;
+    [SerializeField] private Transform SensorR2;
+    [SerializeField] private Transform SensorR3;
+    [SerializeField] private Transform SensorOR;
+
+    [SerializeField] private float maxSteeringAngle;
+    [SerializeField] private float motorForce;
+    [SerializeField] private float brakeForce;
+
+    private Rigidbody rb;
+    [SerializeField] private float angle_x;
+    [SerializeField] private float angle_z;
+    [SerializeField] private float velocity;
+
+    private float steerAngle;
+    private bool isBreaking;
+
+    private float s1dist = 7;
+    private float s3dist = 15;
+
+    private void Start()
+    {
+        rb = GetComponent<Rigidbody>();
+
+        float s1x = 0; float s1y = 12; float s1z = 0;
+        float s3x = 10; float s3y = 45; float s3z = 0;
+
+        AdjustSensors(SensorL1, s1x, -s1y, s1z);
+        AdjustSensors(SensorR1, s1x, s1y, s1z);
+
+        AdjustSensors(SensorL3, s3x, -s3y, s3z);
+        AdjustSensors(SensorR3, s3x, s3y, s3z);
+
+        //AdjustSensors(SensorL2, s2x, -s2y, s2z);
+        //AdjustSensors(SensorR2, s2x, s2y, s2z);
+
+        AdjustSensors(SensorOR, 50, 180, 0);
+    }
+
+    private void FixedUpdate()
+    {
+        StayonRoad();
+        //AvoidObst();
+        AdjustSpeed();
+        HandleMotor();
+        UpdateWheels();
+
+        angle_x = SensorOR.eulerAngles.x;
+        angle_z = SensorOR.eulerAngles.z;
+
+        velocity = rb.velocity.magnitude;
+    }
+
+    private void AdjustSensors(Transform sensor, float x_angle, float y_angle, float z_angle)
+    {
+        sensor.transform.Rotate(x_angle, y_angle, z_angle);
+    }
+
+    private void HandleMotor()
+    {
+        frontLeftWheelCollider.motorTorque = motorForce;
+        frontRightWheelCollider.motorTorque = motorForce;
+        rearLeftWheelCollider.motorTorque = motorForce /2 ;
+        rearRightWheelCollider.motorTorque = motorForce /2 ;
+
+        if (velocity > 5)
+        {
+            isBreaking = true;
+        }
+        else
+        {
+            isBreaking = false;
+        }
+
+        brakeForce = isBreaking ? 3000f : 0f;
+        frontLeftWheelCollider.brakeTorque = brakeForce;
+        frontRightWheelCollider.brakeTorque = brakeForce;
+        rearRightWheelCollider.brakeTorque = brakeForce;
+        rearLeftWheelCollider.brakeTorque = brakeForce;
+
+    }
+
+    private void UpdateWheels()
+    {
+        UpdateWheelPos(frontLeftWheelCollider, frontLeftWheelTransform);
+        UpdateWheelPos(frontRightWheelCollider, frontRightWheelTransform);
+        UpdateWheelPos(rearLeftWheelCollider, rearLeftWheelTransform);
+        UpdateWheelPos(rearRightWheelCollider, rearRightWheelTransform);
+    }
+
+    private void UpdateWheelPos(WheelCollider wheelCollider, Transform trans)
+    {
+        Vector3 pos;
+        Quaternion rot;
+        wheelCollider.GetWorldPose(out pos, out rot);
+        trans.rotation = rot;
+        trans.position = pos;
+
+    }
+
+    private void HandleSteering(float angle)
+    {
+        //steerAngle = maxSteeringAngle * angle;
+        frontLeftWheelCollider.steerAngle = angle;
+        frontRightWheelCollider.steerAngle = angle;
+
+    }
+
+    private bool sense(Transform sensor, float sensorLength)
+    {
+        RaycastHit hit;
+        if (Physics.Raycast(sensor.position, sensor.TransformDirection(Vector3.forward), out hit, sensorLength))
+        {
+            string hitObject = hit.transform.GetComponent<Renderer>().name;
+            if (hitObject.Contains("MT"))
+            {
+                Debug.DrawRay(sensor.position, sensor.TransformDirection(Vector3.forward) * sensorLength, Color.clear);
+                return true;
+            }
+            Debug.DrawRay(sensor.position, sensor.TransformDirection(Vector3.forward) * sensorLength, Color.clear);
+            return false;
+        }
+        else
+        {
+            Debug.DrawRay(sensor.position, sensor.TransformDirection(Vector3.forward) * sensorLength,Color.clear);
+            return false;
+        }
+
+
+    }
+
+    private bool SenseObstruction(Transform sensor, float sensorLength)
+    {
+        RaycastHit hit;
+        if (Physics.Raycast(sensor.position, sensor.TransformDirection(Vector3.forward), out hit, sensorLength))
+        {
+            string hitObject = hit.transform.GetComponent<Renderer>().name;
+            if (hitObject.Contains("Cube"))
+            {
+                Debug.DrawRay(sensor.position, sensor.TransformDirection(Vector3.forward) * sensorLength, Color.clear);
+                return true;
+            }
+            Debug.DrawRay(sensor.position, sensor.TransformDirection(Vector3.forward) * sensorLength, Color.clear);
+            return false;
+        }
+        else
+        {
+            Debug.DrawRay(sensor.position, sensor.TransformDirection(Vector3.forward) * sensorLength, Color.clear);
+            return false;
+        }
+
+
+    }
+
+
+    private void StayonRoad()
+    {
+
+        if (!sense(SensorL3, s3dist) || !sense(SensorR3, s3dist))
+        {
+            if (!sense(SensorL3, s3dist))
+            {
+                HandleSteering(60);
+            }
+
+            if (!sense(SensorR3, s3dist))
+            {
+                HandleSteering(-60);
+            }
+        }
+        else
+        {
+            HandleSteering(0);
+        }
+
+        if (SenseObstruction(SensorFR, s3dist) || SenseObstruction(SensorL1, s1dist) || SenseObstruction(SensorR1, s1dist))
+        {
+            HandleSteering(60);
+
+            if (SenseObstruction(SensorL1, s1dist))
+            {
+                HandleSteering(60);
+            }
+            if (SenseObstruction(SensorR1, s1dist))
+            {
+                HandleSteering(-60);
+            }
+        }
+        else
+        {
+        }
+
+    }
+
+    private void AdjustSpeed()
+    {
+        motorForce = 2000f;
+
+        if (velocity < 2 && motorForce < 2000)
+        {
+            motorForce = motorForce + 0.5f;
+        }
+        if (velocity > 4 && motorForce > 0)
+        {
+            motorForce = motorForce - 0.5f;
+        }
+    }
+
+    /*private void AvoidObst()
+    {
+        if (sense(SensorL2, s2dist))
+        {
+            HandleSteering(60);
+        }
+        if (sense(SensorR2, s2dist))
+        {
+            HandleSteering(-60);
+        }
+
+    }*/
+
+
+
+
+}
